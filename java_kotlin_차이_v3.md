@@ -26,22 +26,23 @@ val name: String? = getName()
 val length = name?.length ?: 0
 ```
 
-주로 사용하는 연산자는 안전 호출 `?.`와 Elvis 연산자 `?:`다. `!!`는 “null이 아님을 내가 보장한다”는 단언이며, 값이 실제로 null이면 NPE를 발생시키므로 null safety를 위한 일반적인 해결책으로 보면 안 된다.
+주로 사용하는 연산자는 안전 호출 `?.`와 Elvis 연산자 `?:`다. `!!`는 “null이 아님을 내가 보장한다”는 단언이며, 값이 실제로 null이면 NPE를 발생시키므로 주의해서 사용해야 한다.
 
-Java에서 null 참조로 메서드를 호출하거나 필드에 접근하면 JVM이 `NullPointerException`을 던진다. Java의 타입만으로는 해당 참조가 null일 수 있는지를 구분하지 않기 때문에, 팀 규칙·애너테이션·정적 분석 도구·`Optional` 등을 함께 사용해 관리한다.
+Java에서 null 참조로 메서드를 호출하거나 필드에 접근하면 JVM이 `NullPointerException`을 던진다. Java의 타입만으로는 해당 참조가 null일 수 있는지를 구분하지 못하기 때문에, 팀 규칙·애너테이션·정적 분석 도구·`Optional` 등을 함께 사용해 관리한다.
 
-여기서 중요한 건, Kotlin의 검사가 **컴파일 시점에서 끝나지 않는다**는 점이다. Kotlin 컴파일러는 Java와의 상호 운용 과정에서 non-null 매개변수 계약을 지키기 위해 `Intrinsics.checkNotNullParameter()` 같은 검사 호출을 바이트코드에 생성할 수 있다. Java 쪽에서 넘어오는 값은 컴파일러가 통제할 수 없으니, 계약이 깨지는 지점을 최대한 이르게 잡으려는 것이다.
+여기서 중요한 건, Kotlin의 검사가 **컴파일 시점에서 끝나지 않는다**는 점이다. Kotlin 컴파일러는 Java와의 상호 운용 과정에서 non-null 매개변수 계약을 지키기 위해 `Intrinsics.checkNotNullParameter()` 같은 검사 호출을 바이트코드에 생성할 수 있다. Java 쪽에서 넘어오는 값은 컴파일러도 통제할 수 없으니, Null이 발생하는 지점을 최대한 빠르게 잡으려는 것이다.(항상 그런건 아님)
 
-다만 정확한 바이트코드 모양은 Kotlin 컴파일러 버전과 선언 위치에 따라 달라질 수 있으므로, 이를 모든 non-null 값에 항상 삽입되는 검사라고 일반화해서는 안 된다.
-
-정리하면 Kotlin null safety의 핵심은 null 계약을 타입에 드러내고, nullable 값의 사용 지점을 컴파일 시점에 확인하는 데 있다. `!!`, 초기화 문제, Java에서 넘어온 platform type처럼 타입 시스템 밖에서 들어오는 값은 별도로 주의해야 한다.
+정리하면 Kotlin null safety의 핵심은 null 계약을 타입에 드러내고, nullable 값의 사용 지점을 **컴파일 시점**에 확인하는 데 있다. `!!`, 초기화 문제, Java에서 넘어온 platform type처럼 타입 시스템 밖에서 들어오는 값은 더욱 주의해야 한다.
+&nbsp;
+> **Platform type**
+Platform type은 Java의 타입을 Kotlin에서 사용할 때 자동으로 변환되는 타입이다. Java의 `String`은 Kotlin의 `String!`으로 변환된다.
 
 ## 2. 데이터 클래스: data class와 record
 
 Kotlin의 `data class`는 데이터를 담는 클래스를 짧게 만들 때 유용하다.
 
 ```kotlin
-data class User(val name: String, val age: Int)
+data class User(val name: String, var age: Int)
 ```
 
 Java도 Java 16부터 record를 제공한다.
@@ -50,25 +51,27 @@ Java도 Java 16부터 record를 제공한다.
 public record User(String name, int age) {}
 ```
 
-둘 다 접근자와 값 기반 `equals`, `hashCode`, `toString`을 자동으로 제공한다. 따라서 단순 DTO나 값 객체에서는 과거보다 차이가 작아졌다. 다만 Kotlin `data class`는 `copy()`와 구조 분해에 쓰이는 `componentN()`을 제공하고, 생성자 프로퍼티를 `var`로 선언할 수도 있다. 반대로 Java record는 구성 요소 필드가 `final`이고 클래스도 상속할 수 없도록 설계된 데이터 운반용 타입이다.
+둘 다 접근자와 값 기반 `equals`, `hashCode`, `toString`을 자동으로 제공한다. 따라서 단순 DTO나 값 객체에서는 과거보다 차이가 작아졌다. 다만 자동 생성 범위와 불변성에 대한 제약은 다르다.
 
-스마트 캐스트도 차이가 줄어든 영역이다. Kotlin은 타입 검사 뒤에 타입을 자동으로 좁힌다.
+| 비교 항목 | Kotlin `data class` | Java `record` |
+| --- | --- | --- |
+| 자동 생성 | `equals()`, `hashCode()`, `toString()`, `componentN()`, `copy()` | `equals()`, `hashCode()`, `toString()`, 구성 요소 접근자 |
+| 구조 분해 | `componentN()`을 이용해 지원 | 언어 차원의 구조 분해 문법 없음 |
+| 복사 | `copy()`로 일부 프로퍼티만 바꾼 새 객체 생성 가능 | 필요한 구성 요소를 지정해 새 객체를 직접 생성 |
+| 구성 요소의 가변성 | 주 생성자 프로퍼티를 `val` 또는 `var`로 선언 가능 | 모든 구성 요소가 `final` |
+| 값 비교 대상 | 주 생성자에 선언한 프로퍼티 | record header에 선언한 모든 구성 요소 |
+| 상속·구현 | data class 자체는 상속할 수 없지만, 다른 클래스를 상속하거나 인터페이스를 구현할 수 있음 | 암묵적으로 `final`이며 다른 클래스는 상속할 수 없지만, 인터페이스는 구현할 수 있음 |
+
+구조 분해는 객체의 프로퍼티를 여러 변수에 한 번에 꺼내는 문법이다. `data class`가 자동 생성하는 `componentN()` 덕분에 다음처럼 쓸 수 있다.
 
 ```kotlin
-if (obj is String) {
-    println(obj.uppercase())
-}
+val user = User("Min", 20)
+val (name, age) = user
 ```
 
-Java도 패턴 매칭 `instanceof`로 비슷한 코드를 쓸 수 있다.
+이는 `user.component1()`과 `user.component2()`를 각각 호출하는 것과 같다. Java record는 `user.name()`과 `user.age()` 같은 접근자를 제공하지만, 이 `componentN()` 기반 문법은 없다.
 
-```java
-if (obj instanceof String str) {
-    System.out.println(str.toUpperCase());
-}
-```
-
-이 절은 “예전에는 차이였지만 지금은 아닌” 영역에 가깝다. Kotlin의 장점을 이야기할 때 관성적으로 끌려 나오지만, 현대 Java와 비교하면 남는 차이는 `copy()`와 구조 분해 정도다.
+Kotlin의 `data class`는 `var`도 허용하므로 반드시 불변 객체는 아니다. 반면 Java record는 구성 요소를 바꿀 수 없도록 제약한다. 다만 record의 구성 요소가 가리키는 객체까지 깊게 불변인 것은 아니므로, 가변 컬렉션 등을 담을 때는 별도 설계가 필요하다.
 
 ## 3. val과 var
 
@@ -79,21 +82,20 @@ val users = mutableListOf("A")
 users.add("B") // 가능: 참조는 고정이지만 객체 내부는 가변
 ```
 
-`val`과 `final`은 참조의 재할당을 막는다. 객체 내부의 변경 가능성은 컬렉션 타입과 클래스 설계로 별도로 결정한다.
-
-차이는 기능이 아니라 **기본값**에 있다. Java에서 `final`은 붙이지 않으면 그만인 선택지지만, Kotlin은 모든 변수에 `val` 또는 `var` 중 하나를 반드시 쓰게 한다. 재할당 의도를 생략할 수 없게 만든 것이고, 이건 스타일이 아니라 문법 강제다.
+하지만 Java에선 final이 선택의 영역이지만 Kotlin은 모든 변수에 `val`/`var` 선택이 필수이다. 문법에 의해 강제되기 때문에 불변 객체를 쉽게 구분할 수 있다.
 
 ## 4. 확장 함수
 
 Java에서는 보통 `StringUtils` 같은 유틸리티 클래스에 정적 메서드를 둔다. Kotlin은 이를 수신 객체의 멤버처럼 호출하는 문법을 제공한다.
 
 ```kotlin
+//StringUtils.kt
 fun String.lastChar(): Char = this[length - 1]
 
 val result = "Hello".lastChar()
 ```
 
-그런데 이게 JVM에서 정말 `String`에 메서드를 추가하는 건 아니다. 위 함수가 `StringUtils.kt` 최상위에 선언되었다면, 대략 다음과 같은 정적 메서드가 된다.
+JVM에서 실제 `String`에 메서드를 추가하는 건 아니고, 위 함수가 `StringUtils.kt` 최상위에 선언되었다면, 대략 다음과 같은 정적 메서드가 된다.
 
 ```java
 public final class StringUtilsKt {
@@ -105,17 +107,33 @@ public final class StringUtilsKt {
 char result = StringUtilsKt.lastChar("Hello");
 ```
 
-즉 Java의 유틸리티 클래스와 **바이트코드 수준에서는 같은 것**이고, 다른 건 호출 문법뿐이다. 그래서 호출 대상은 선언된 수신 타입을 기준으로 컴파일 시점에 결정되고(정적 디스패치), 같은 시그니처의 멤버 함수가 있으면 멤버 함수가 우선한다. 확장 함수는 오버라이드되지 않는다.
+즉 Java의 util 클래스와 **바이트코드 수준에서는 같은 것**이고, 다른 건 호출 문법뿐이다. 그래서 호출 대상은 선언된 수신 타입을 기준으로 컴파일 시점에 결정되고(정적 디스패치), 같은 시그니처의 멤버 함수가 있으면 멤버 함수가 우선된다. 확장 함수는 오버라이드되지 않는다.
 
 확장 함수의 가치는 기존 타입을 수정하지 않고도 도메인 문맥에 맞는 호출 문법을 제공한다는 데 있다. 성능이 중요한 지점에서는 실제 병목을 측정해 판단하면 된다.
 
+이를 통해 `method chaining`을 더 쉽게 활용할 수 있고, 코드의 가독성을 더 더욱 높일 수 있다. `operator override`와 함께 내가 kotlin에서 좋아하는 문법 중 하나이다.
+
+```java
+String target = "sejinLee";
+char whatIWant = StringUtil.getLastName(target).getCharAt(0);
+```
+
+```kotlin
+val target = "sejinLee"
+val whatIWant = target.getLastName().first()
+```
+
 ## 5. 고차 함수와 inline
 
-Java와 Kotlin 모두 객체 지향과 함수형 스타일을 함께 지원하는 다중 패러다임 언어다. Java에서는 함수형 인터페이스와 람다, Stream API를 조합하고, 현대 Java의 람다는 주로 `invokedynamic`으로 구현된다. 캡처하지 않는 람다는 재사용될 수 있고, 캡처하는 람다는 객체를 할당할 수 있으며, JIT 컴파일러가 일부 비용을 제거하기도 한다.
+Java와 Kotlin 모두 객체 지향과 함수형 스타일을 함께 지원하는 `다중 패러다임` 언어다. Java에서는 함수형 인터페이스와 람다, Stream API를 조합하고, JVM이 실행 시점에 연결하는 방식으로 구현된다. 캡처하지 않는 람다는 함수 객체를 재사용할 수 있고, 캡처하는 람다는 값을 보관하기 위해 새 객체가 필요하다.
+> **캡쳐**는 바깥 범위의 값을 사용하는 것을 의미한다. 여기서는 람다에서 외부 변수를 참조를 하는지를 말한다.
+또한 캡쳐하는 람다도 JVM 최적화를 통해 특정 상황에선 재사용 가능하다.
 
-Kotlin은 `(T) -> R` 같은 함수 타입이 언어에 포함되어 있고, 확장 함수·고차 함수와 함께 사용할 수 있어 컬렉션 처리나 DSL을 비교적 간결하게 작성할 수 있다. 따라서 “Java는 함수형 프로그래밍을 못 하고 Kotlin만 할 수 있다”가 아니라, Kotlin이 함수형 스타일을 더 적은 의식으로 표현하게 해 준다고 이해하는 편이 정확하다.
+&nbsp;
+<br/>
+Kotlin은 함수 타입(`(T) -> R`)이 언어에 포함되어 있고, 확장 함수·고차 함수와 함께 사용할 수 있어 컬렉션 처리나 DSL을 더 간결하게 작성할 수 있다. 따라서 'Java도 되지만 Kotlin이 함수형 스타일을 더 잘 표현하게 해 준다'고 이해하는 편이 정확하다.
 
-Kotlin에서도 고차 함수에 전달하는 람다는 함수 객체와 간접 호출 비용을 만들 수 있다. `inline` 함수는 함수 본문과 inlinable 람다를 호출 지점에 삽입해 이 비용을 줄일 수 있다.
+Kotlin에서도 고차 함수에 전달되는 람다는 함수 객체와 간접 호출 비용을 만들 수 있다. `inline` 함수는 함수 본문과 inlinable 람다를 호출 지점에 삽입해 이 비용을 줄일 수 있다.
 
 ```kotlin
 inline fun <T> measure(block: () -> T): T {
@@ -123,41 +141,35 @@ inline fun <T> measure(block: () -> T): T {
 }
 ```
 
-`inline`은 작은 고차 함수가 반복적으로 호출되는 지점에서 람다 객체와 간접 호출 비용을 줄이는 도구다. 대신 호출 지점의 코드 크기는 커지고, `noinline`으로 표시된 람다는 인라인되지 않는다. 따라서 비용이 확인된 작은 함수에 적용하는 것이 좋다.
+하지만 `inline`시 코드 크기가 늘어나기에 **본문이 단순하고, 성능이 중요한 기능에서 많이 호출되는 경우**에 쓰는 것이 권장되고, `noinline`으로 표시된 람다는 인라인되지 않는다.
 
 ## 6. coroutine과 suspend
 
-여기가 Java에 대응물이 없는 영역이다. 그리고 coroutine을 “코틀린이 제공하는 비동기 라이브러리” 정도로 알고 있었다면 절반만 맞다. coroutine은 세 층으로 나뉘어 있고, 각 층이 서로 다른 곳에 산다.
+여기는 Java에 1:1로 대응하는 기능이 없는 영역이다. Kotlin coroutine은 `suspend`와 **구조화된 동시성**을 중심으로 한 비동기 작업 모델이고, Java virtual thread는 JVM이 제공하는 가벼운 스레드다.
 
-| 층 | 실체 | 어디 있나 |
-| --- | --- | --- |
-| **언어/컴파일러** | `suspend` 키워드, CPS 변환, 상태 머신 생성 | Kotlin 컴파일러 자체 |
-| **표준 라이브러리** | `Continuation`, `suspendCoroutine`, `CoroutineContext` | `kotlin-stdlib`의 `kotlin.coroutines` |
-| **동시성 프레임워크** | `launch`, `async`, `Job`, `Dispatchers`, `Flow` | `kotlinx-coroutines` (별도 의존성) |
-
-핵심은 **중단·재개 메커니즘 자체가 라이브러리가 아니라 컴파일러 기능**이라는 점이다. `suspend fun`은 바이트코드에서 `Continuation`을 마지막 인자로 받는 함수로 바뀌고, 함수 본문은 중단 지점마다 분기하는 상태 머신으로 변환된다.
+핵심은 `suspend`가 단순한 코드 스타일이 아니라, 컴파일러가 중단·재개 가능한 코드로 변환하는 언어 기능이라는 점이다. 스케줄링·취소·구조화 같은 실행 정책은 `kotlinx-coroutines`가 맡는다.
+<br/>
+> **구조화된 동시성**은 비동기 작업도 일반 함수 호출처럼, 시작한 코드 범위 안에서 끝나게 하는 규칙이다. 코드 블록의 중첩 구조와 coroutine의 생명주기 구조를 맞춘다고 생각하면 된다.
 
 ```kotlin
-suspend fun load(id: Long): User {
-    val user = fetchUser(id)          // 중단 가능 지점
-    val profile = fetchProfile(user)  // 중단 가능 지점
-    return user.with(profile)
+suspend fun loadPage(): Page = coroutineScope {
+    val user = async { loadUser() }
+    val orders = async { loadOrders() }
+
+    Page(user.await(), orders.await())
 }
 ```
 
-이 함수는 순차 코드처럼 보이지만, 컴파일 후에는 “지금 몇 번째 단계인가”를 들고 다니며 호출될 때마다 해당 지점부터 재개하는 구조가 된다. 확장 함수가 정적 메서드로 바뀌는 것, `inline`이 본문을 호출 지점에 삽입하는 것과 같은 성격이되, 변환의 규모가 가장 크다.
+- `loadPage()`는 두 작업이 끝난 뒤에만 반환한다. 한 작업이 실패하면 다른 작업도 취소되고 실패가 호출자에게 전달된다.
+- `loadPage()`를 실행하던 coroutine이 취소되면 내부 작업도 함께 취소된다.
 
-`kotlinx-coroutines`가 그 위에 얹는 건 스케줄링·취소·구조화다. 정리하면 “어떻게 멈추고 재개하나”는 언어가, “누가 언제 실행하고 취소하나”는 라이브러리가 담당한다.
+&nbsp;
 
-Java에서는 `ExecutorService`, `CompletableFuture`, reactive 라이브러리 등으로 비동기 작업을 구성해 왔고, JDK 21부터는 virtual thread가 중요한 선택지다. 다만 virtual thread는 같은 문제를 **JVM 런타임 차원**에서 푸는 접근이라, 컴파일러 변환으로 푸는 coroutine과는 해법의 층위가 다르다. 어느 쪽이든 결국 dispatcher와 스레드 같은 실행 기반은 필요하다.
-
-그리고 이 절이 처음의 질문에 대한 가장 분명한 답이기도 하다. `suspend`는 코드 스타일 문제로 환원되지 않는다.
+구현 원리와 Java virtual thread와의 자세한 비교는 다른 글에서 다루겠다..!!
 
 ## 7. 언어 밖의 차이
 
-문법도 컴파일 결과도 아니지만 실제로 체감되는 차이가 남아 있다.
-
-**런타임 의존성.** Kotlin 표준 라이브러리는 컬렉션 확장 함수, 범위 함수, null 처리 보조 기능 등 Kotlin 코드의 기반 기능을 제공한다. 배포할 때는 Gradle이나 Maven이 런타임 의존성으로 관리하거나, 실행 가능한 JAR에 함께 포함한다. coroutine을 쓴다면 `kotlinx-coroutines`가 추가로 붙는다. Java는 JDK 표준 라이브러리만으로 출발한다.
+**런타임 의존성.** Java는 대부분 JDK 표준 라이브러리만으로 실행할 수 있다. Kotlin/JVM 애플리케이션은 Kotlin 표준 라이브러리가 필요하며, coroutine의 `launch`, `async`, `Flow` 등을 사용하면 `kotlinx-coroutines` 의존성도 추가된다.
 
 **최상위 선언.** Kotlin 컴파일러는 최상위 함수와 프로퍼티를 JVM 클래스에 담는다. `Example.kt`의 최상위 함수는 기본적으로 `ExampleKt`의 정적 메서드가 된다. `@file:JvmName`으로 Java에서 보이는 클래스 이름을 바꿀 수도 있다. Java에서는 모든 선언이 타입 내부에 있어야 하므로, 이건 상호 운용 시 이름이 어떻게 보일지의 문제가 된다.
 
@@ -165,9 +177,9 @@ Java에서는 `ExecutorService`, `CompletableFuture`, reactive 라이브러리 �
 
 웬만하면 하나의 글로 정리하고 싶었지만, 설명하려면 하위 개념이 나오고 또 그 하위 개념을 설명해야 해서 끝이 없다. 하지만 이걸 안 하면 이해도, 설명도 안 된다. 견뎌라.
 
-처음 질문으로 돌아가면, “코드 스타일 빼고”라는 단서는 사실 나눠 볼 필요가 있었다. data class나 스마트 캐스트처럼 현대 Java가 따라잡아 차이가 거의 없어진 것도 있고, null 계약이나 `val`/`var`처럼 스타일로 보이지만 실은 타입 시스템이 강제하는 것도 있으며, `suspend`처럼 애초에 스타일의 문제가 아닌 것도 있다.
+처음 질문으로 돌아가면, “코드 스타일 빼고”라는 단서는 사실 나눠 볼 필요가 있었다. data class와 record처럼 현대 Java와 Kotlin의 겹치는 범위가 넓어진 것도 있고, null 계약이나 `val`/`var`처럼 스타일로 보이지만 실은 타입 시스템이 강제하는 것도 있으며, `suspend`처럼 애초에 스타일의 문제가 아닌 것도 있다.
 
-null safety, 확장 함수, `inline`, coroutine처럼 더 파고들 주제는 따로 정리해서 이 글에도 링크를 걸어 오겠다. 그때 다시 만나요~
+coroutine의 더 파고들 주제는 따로 정리해서 이 글에도 링크를 걸어 오겠다. 그때 다시 만나요~
 
 ## 참고 자료
 
