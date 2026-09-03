@@ -12,3 +12,5 @@
 쟝고와 fastapi의 핵심 차이
 tag2now에서 사용한 python에서 aop 구햔
 asyncio 대해
+python async 키워드와 @pytest.mark.asyncio
+tag2now의 test 코드 리뷰 필요
