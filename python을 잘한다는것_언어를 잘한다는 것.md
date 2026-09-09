@@ -76,6 +76,8 @@ Arrays.stream(s.replaceAll("[-0-9]{1,5} Z", "").split(" ")).filter(r -> !r.isEmp
 그럼 뭐가 가독성이냐?
 한눈에 흐름이 보이는 것이 중요하다 생각한다.
 
+<br/>
+
 ```python
 formatted_words = []
 
