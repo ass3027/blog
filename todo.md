@@ -1,5 +1,5 @@
 [  ] 사이드 프로젝트에서 db index 고려점
-[  ] python을 잘하는 기준
+[x] python을 잘하는 기준
 [  ] postgres를 최대한 활용하여 다른 기술을 대체하는 것
 [  ] java kotlin의 차이 코드 스타일 제외
 [  ] cloud 환경에서 로그 수집 시 공학적 기술
