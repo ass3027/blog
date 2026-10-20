@@ -20,6 +20,10 @@
 - [ ] spring boot와 fastapi의 차이
 - [ ] ioc di와 aop에 대해 더 더욱
 - [ ] 쟝고와 fastapi의 핵심 차이
+- [ ] fastapi의 `Depends`
+- [ ] spring IoC Container
+- [ ] Spring Application Context
+- [ ] uvicorn에 대하여
 
 ## logging
 - [ ] cloud 환경에서 로그 수집 시 공학적 기술
